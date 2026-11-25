@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DSS Certificate Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Noto+Serif+Bengali:wght@400&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --navy: #0E2A35;
+      --teal: #1B8A7A;
+      --gold: #C9A24B;
+      --cream: #FBF5E6;
+      --ink: #1c2b31;
+      --muted: #5d6e74
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #EEF3F2;
+      color: var(--ink)
+    }
+
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 18px 20px;
+      text-align: center
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: .5px
+    }
+
+    header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #9fd3c7
+    }
+
+    main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px 16px 40px
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #d9e3e1;
+      border-radius: 14px;
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr 180px
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--muted)
+    }
+
+    input[type=text],
+    input[type=number] {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #c3d1ce;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 16px;
+      background: #fff;
+      color: var(--ink)
+    }
+
+    input:focus {
+      outline: 2px solid var(--teal);
+      border-color: var(--teal)
+    }
+
+    .count {
+      display: flex;
+      gap: 6px
+    }
+
+    .count button {
+      width: 44px;
+      flex: none;
+      padding: 0;
+      font-size: 20px
+    }
+
+    .count input {
+      text-align: center
+    }
+
+    .actions {
+      grid-column: 1/-1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px
+    }
+
+    button {
+      height: 44px;
+      padding: 0 18px;
+      border-radius: 10px;
+      border: 1px solid #c3d1ce;
+      background: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer
+    }
+
+    button:hover {
+      border-color: var(--teal)
+    }
+
+    button.primary {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: #fff
+    }
+
+    button.primary:hover {
+      background: #15404f
+    }
+
+    .hint {
+      grid-column: 1/-1;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: 0
+    }
+
+    .preview {
+      margin-top: 18px
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      box-shadow: 0 6px 24px rgba(14, 42, 53, .18);
+      background: #fff
+    }
+
+    .toast {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--teal);
+      min-height: 18px
+    }
+
+    @media(max-width:620px) {
+      .panel {
+        grid-template-columns: 1fr
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>DSS Certificate Generator</h1>
+    <p>Divine Spectrum SUST · Winter Blanket Campaign</p>
+  </header>
+  <main>
+    <section class="panel">
+      <div>
+        <label for="name">Donor name</label>
+        <input id="name" type="text" placeholder="Afazur Rahman" autocomplete="off" maxlength="80">
+      </div>
+      <div>
+        <label for="count">Number of blankets</label>
+        <div class="count">
+          <button type="button" id="minus" aria-label="Decrease">−</button>
+          <input id="count" type="number" min="1" max="99999" value="1" inputmode="numeric">
+          <button type="button" id="plus" aria-label="Increase">+</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="dlPng" type="button">Download PNG</button>
+        <button class="primary" id="dlPdf" type="button">Download PDF</button>
+        <button id="share" type="button">Share</button>
+      </div>
+      <p class="hint">Type the donor's name and the number of blankets (৳300 each). The preview updates instantly. Long
+        names shrink or split into two lines automatically.</p>
+    </section>
+
+    <section class="preview">
+      <canvas id="cert"></canvas>
+      <div class="toast" id="toast"></div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      // ---- Change these directly in the code when needed ----
+      var CAMPAIGN_TITLE = 'Warmth for Winter 2026';
+      var COORDINATOR_NAME = 'Md Shafayet Karim Yeshen';
+      var COORDINATOR_TITLE = 'Campaign Coordinator';
+      var SECRETARY_NAME = 'Md Afazur Rahman';
+      var SECRETARY_TITLE = 'Secretary General, DSS';
+      // --------------------------------------------------------
+
+      var W = 680, H = 500, S = 4;
+      var canvas = document.getElementById('cert');
+      canvas.width = W * S; canvas.height = H * S;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+
+      var nameInput = document.getElementById('name');
+      var countInput = document.getElementById('count');
+      var toast = document.getElementById('toast');
+
+      var SERIF = '"Playfair Display", Georgia, "Noto Serif Bengali", serif';
+      var SCRIPT = '"Great Vibes", "Noto Serif Bengali", cursive';
+
+      function spaced(text, cx, y, sp) {
+        var chars = Array.from(text), widths = [], total = 0, i;
+        for (i = 0; i < chars.length; i++) { widths[i] = ctx.measureText(chars[i]).width; total += widths[i]; }
+        total += sp * (chars.length - 1);
+        var x = cx - total / 2;
+        ctx.textAlign = 'left';
+        for (i = 0; i < chars.length; i++) { ctx.fillText(chars[i], x, y); x += widths[i] + sp; }
+        ctx.textAlign = 'center';
+        return total;
+      }
+
+      function wrap(text, maxW) {
+        var words = text.split(' '), lines = [], line = '', i, t;
+        for (i = 0; i < words.length; i++) {
+          t = line ? line + ' ' + words[i] : words[i];
+          if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = words[i]; }
+          else line = t;
+        }
+        if (line) lines.push(line);
+        return lines;
+      }
+
+      function getCount() {
+        var n = parseInt(countInput.value, 10);
+        if (!n || n < 1) n = 1;
+        if (n > 99999) n = 99999;
+        return n;
+      }
+
+      function draw() {
+        var name = (nameInput.value.trim().replace(/\s+/g, ' ')) || 'Donor Name';
+        var count = getCount();
+        var n = count.toLocaleString('en-US');
+        var i;
+
+        ctx.setTransform(S, 0, 0, S, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = '#0E2A35'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#FBF5E6'; ctx.fillRect(14, 14, 652, 472);
+        ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 1; ctx.strokeRect(14, 14, 652, 472);
+
+        // subtle background texture
+        ctx.save();
+        ctx.beginPath(); ctx.rect(24, 24, 632, 452); ctx.clip();
+        ctx.strokeStyle = 'rgba(27,138,122,0.09)'; ctx.lineWidth = 0.6;
+        for (var bx = -430; bx <= 656; bx += 12) {
+          ctx.beginPath(); ctx.moveTo(bx, 476); ctx.lineTo(bx + 452, 24); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(201,162,75,0.2)'; ctx.lineWidth = 0.7;
+        [130, 160, 190, 220].forEach(function (r) {
+          ctx.beginPath(); ctx.arc(340, 250, r, 0, Math.PI * 2); ctx.stroke();
+        });
+        ctx.restore();
+
+        // vortex corners
+        ctx.save();
+        ctx.beginPath(); ctx.rect(24, 24, 632, 452); ctx.clip();
+        var rings = [[36, '#1B8A7A'], [46, '#2E6F9E'], [56, '#7FC4B0'], [66, '#1B8A7A'], [76, '#2E6F9E'], [86, '#7FC4B0']];
+        [[24, 24, 0], [656, 476, Math.PI]].forEach(function (c) {
+          rings.forEach(function (r, idx) {
+            var start = c[2] + idx * 22 * Math.PI / 180;
+            ctx.beginPath();
+            ctx.arc(c[0], c[1], r[0], start, start + Math.PI * 2 * 0.8);
+            ctx.strokeStyle = r[1]; ctx.lineWidth = 1.3; ctx.stroke();
+          });
+        });
+        ctx.restore();
+
+        ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 0.6; ctx.strokeRect(24, 24, 632, 452);
+
+        // header
+        ctx.fillStyle = '#1B8A7A'; ctx.font = '500 12px ' + SERIF;
+        spaced('DIVINE SPECTRUM SUST · DSS', 340, 62, 3);
+        ctx.fillStyle = '#0E2A35'; ctx.font = '500 36px ' + SERIF;
+        spaced('CERTIFICATE', 340, 106, 6);
+        ctx.fillStyle = '#B38A2E'; ctx.font = '400 14px ' + SERIF;
+        spaced('OF APPRECIATION', 340, 130, 7);
+
+        // campaign title
+        var camp = CAMPAIGN_TITLE.toUpperCase();
+        ctx.fillStyle = '#1B8A7A'; ctx.font = '500 11px ' + SERIF;
+        var cw = spaced(camp, 340, 150, 2.5);
+        var gx1 = Math.max(40, 340 - cw / 2 - 74), gx2 = 340 - cw / 2 - 14;
+        ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gx1, 146); ctx.lineTo(gx2, 146);
+        ctx.moveTo(680 - gx2, 146); ctx.lineTo(680 - gx1, 146);
+        ctx.stroke();
+
+        ctx.fillStyle = '#3B4A50'; ctx.font = 'italic 400 14px ' + SERIF;
+        ctx.fillText('This certificate is proudly presented to', 340, 176);
+
+        // donor name with auto-fit
+        var maxW = 470, size = 52, lines = [name], two = false;
+        function fits(t, s) { ctx.font = s + 'px ' + SCRIPT; return ctx.measureText(t).width <= maxW; }
+        var s = 52;
+        while (s > 32 && !fits(name, s)) s--;
+        if (fits(name, s)) { size = s; }
+        else {
+          var words = name.split(' ');
+          if (words.length > 1) {
+            var best = 1, diff = 1e9;
+            ctx.font = '40px ' + SCRIPT;
+            for (i = 1; i < words.length; i++) {
+              var a = ctx.measureText(words.slice(0, i).join(' ')).width;
+              var b = ctx.measureText(words.slice(i).join(' ')).width;
+              var d = Math.abs(a - b);
+              if (d < diff) { diff = d; best = i; }
+            }
+            lines = [words.slice(0, best).join(' '), words.slice(best).join(' ')];
+          }
+          s = 40;
+          while (s > 14 && !lines.every(function (l) { return fits(l, s); })) s--;
+          size = s; two = lines.length > 1;
+        }
+        ctx.fillStyle = '#0E2A35'; ctx.font = size + 'px ' + SCRIPT;
+        if (two) { ctx.fillText(lines[0], 340, 210); ctx.fillText(lines[1], 340, 242); }
+        else ctx.fillText(lines[0], 340, 228);
+        var lineY = two ? 252 : 244;
+        ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(160, lineY); ctx.lineTo(520, lineY); ctx.stroke();
+
+        // body
+        var body = count === 1
+          ? 'in heartfelt gratitude for standing beside a cold-affected neighbour this winter. Your gift of a warm blanket has wrapped a life in comfort and carried the light of kindness into the coldest nights.'
+          : 'in heartfelt gratitude for standing beside cold-affected neighbours this winter. Your gift of ' + n + ' warm blankets has wrapped ' + n + ' lives in comfort and carried the light of kindness into the coldest nights.';
+        ctx.fillStyle = '#2B3A40'; ctx.font = '400 13.5px ' + SERIF;
+        var bl = wrap(body, 520);
+        for (i = 0; i < bl.length; i++) ctx.fillText(bl[i], 340, 276 + i * 18);
+
+        // seal
+        ctx.beginPath(); ctx.arc(340, 392, 40, 0, Math.PI * 2);
+        ctx.setLineDash([2, 3]); ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(340, 392, 34, 0, Math.PI * 2); ctx.fillStyle = '#0E2A35'; ctx.fill();
+        ctx.beginPath(); ctx.arc(340, 392, 30, 0, Math.PI * 2); ctx.strokeStyle = '#C9A24B'; ctx.lineWidth = 0.8; ctx.stroke();
+        var len = String(count).length;
+        var ns = len <= 2 ? 26 : len === 3 ? 22 : len === 4 ? 18 : 15;
+        ctx.fillStyle = '#E7C874'; ctx.font = '400 ' + ns + 'px ' + SERIF;
+        ctx.fillText(String(count), 340, 395);
+        ctx.fillStyle = '#F3E3B0'; ctx.font = '500 8.5px ' + SERIF;
+        spaced(count === 1 ? 'BLANKET' : 'BLANKETS', 340, 409, 1.2);
+
+        // signatures
+        ctx.strokeStyle = '#0E2A35'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(105, 424); ctx.lineTo(275, 424); ctx.moveTo(405, 424); ctx.lineTo(575, 424); ctx.stroke();
+        ctx.fillStyle = '#0E2A35'; ctx.textAlign = 'center';
+        var sigs = [[COORDINATOR_NAME, 190], [SECRETARY_NAME, 490]];
+        var fs = 19;
+        while (fs > 11 && sigs.some(function (p) { ctx.font = 'italic 400 ' + fs + 'px ' + SERIF; return ctx.measureText(p[0]).width > 165; })) fs--;
+        ctx.font = 'italic 400 ' + fs + 'px ' + SERIF;
+        sigs.forEach(function (p) { ctx.fillText(p[0], p[1], 419); });
+        ctx.fillStyle = '#34464C'; ctx.font = '500 11px ' + SERIF;
+        spaced(COORDINATOR_TITLE, 190, 441, 0.5);
+        spaced(SECRETARY_TITLE, 490, 441, 0.5);
+
+        // footer
+        ctx.fillStyle = '#44565C'; ctx.font = '500 10.5px ' + SERIF;
+        spaced('SHAHJALAL UNIVERSITY OF SCIENCE & TECHNOLOGY, SYLHET', 340, 464, 1);
+      }
+
+      function loadFonts() {
+        var t = nameInput.value || 'Aa';
+        return Promise.all([
+          document.fonts.load('52px "Great Vibes"', t),
+          document.fonts.load('40px "Noto Serif Bengali"', t),
+          document.fonts.load('400 13px "Playfair Display"'),
+          document.fonts.load('500 13px "Playfair Display"'),
+          document.fonts.load('italic 400 13px "Playfair Display"')
+        ]).catch(function () { });
+      }
+
+      var timer;
+      function update() {
+        draw();
+        clearTimeout(timer);
+        timer = setTimeout(function () { loadFonts().then(draw); }, 150);
+      }
+
+      function slug() {
+        var s = (nameInput.value.trim() || 'donor').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
+        return 'DSS-Certificate-' + (s || 'donor');
+      }
+
+      function say(msg) { toast.textContent = msg; setTimeout(function () { if (toast.textContent === msg) toast.textContent = ''; }, 4000); }
+
+      function ready() { return loadFonts().then(function () { return document.fonts.ready; }).then(draw); }
+
+      function save(blob, filename) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+      }
+
+      function toBlob() {
+        return new Promise(function (res) { canvas.toBlob(res, 'image/png'); });
+      }
+
+      document.getElementById('dlPng').addEventListener('click', function () {
+        ready().then(toBlob).then(function (b) { save(b, slug() + '.png'); say('PNG downloaded'); });
+      });
+
+      document.getElementById('dlPdf').addEventListener('click', function () {
+        ready().then(function () {
+          if (!window.jspdf) { say('PDF tool did not load. Check your internet and try again.'); return; }
+          var pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'px', format: [W * S, H * S], compress: true });
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, W * S, H * S);
+          pdf.save(slug() + '.pdf');
+          say('PDF downloaded');
+        });
+      });
+
+      document.getElementById('share').addEventListener('click', function () {
+        ready().then(toBlob).then(function (b) {
+          var file = new File([b], slug() + '.png', { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: 'DSS Certificate of Appreciation' }).catch(function () { });
+          } else {
+            save(b, slug() + '.png');
+            say('Sharing is not supported on this device, so the PNG was downloaded. Post it from your Facebook page.');
+          }
+        });
+      });
+
+      document.getElementById('minus').addEventListener('click', function () { countInput.value = Math.max(1, getCount() - 1); update(); });
+      document.getElementById('plus').addEventListener('click', function () { countInput.value = Math.min(99999, getCount() + 1); update(); });
+      nameInput.addEventListener('input', update);
+      countInput.addEventListener('input', update);
+      countInput.addEventListener('blur', function () { countInput.value = getCount(); update(); });
+
+      draw();
+      loadFonts().then(draw);
+    })();
+  </script>
+</body>
+
+</html>
